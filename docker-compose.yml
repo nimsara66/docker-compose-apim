@@ -1,0 +1,33 @@
+services:
+  postgres:
+    image: postgres:14
+    container_name: postgres-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      - "./create_am_databases.sql:/docker-entrypoint-initdb.d/00_create_databases.sql"
+      - "${API_M_HOME}:/wso2am"
+      - "./monetization_am_databases.sql:/docker-entrypoint-initdb.d/03_monetization_am_databases.sql" # for monetization only
+    networks:
+      - db-network
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}", "-h", "postgres-db"]
+      interval: 10s
+      retries: 5
+    command: |
+      bash -c "
+        echo 'Copying and preparing SQL scripts...' && \
+        cat <(echo '\\connect shared_db;') /wso2am/dbscripts/postgresql.sql > /docker-entrypoint-initdb.d/01_postgresql.sql && \
+        cat <(echo '\\connect apim_db;') /wso2am/dbscripts/apimgt/postgresql.sql > /docker-entrypoint-initdb.d/02_apimgt_postgresql.sql && \
+        echo 'Databases created and scripts prepared. Starting PostgreSQL...' && \
+        docker-entrypoint.sh postgres
+      "
+
+volumes:
+  postgres-data:
+
+networks:
+  db-network:
